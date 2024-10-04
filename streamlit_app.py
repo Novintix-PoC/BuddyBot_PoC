@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 import streamlit_pagination as stp
 import zipfile
 import os
- 
+
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
@@ -135,43 +135,42 @@ with col[2]:
             <p class="service-description">"Have a question? Start with “Q:” and BuddyBot will search through your SharePoint files for the best answer. Get instant answers and download related files with ease."</p>
         </div>
     """, unsafe_allow_html=True)
- 
-# Load environment variables from .env file
- 
- 
-# Access environment variables
+
+# Access environment variables using Streamlit secrets
 client_id = st.secrets["CLIENT_ID"]
 client_secret = st.secrets["CLIENT_SECRET"]
 tenant_id = st.secrets["TENANT_ID"]
-redirect_uri = st.secrets["URI"]
- 
+redirect_uri = st.secrets["REDIRECT_URI"]
+
 # Azure AD app details
 authority_url = f'https://login.microsoftonline.com/{tenant_id}'
- 
+
 # Define the scopes required for accessing SharePoint
 scopes = ['Files.ReadWrite.All', 'Sites.Read.All']
- 
+
 # MSAL configuration
 app = msal.ConfidentialClientApplication(
     client_id,
     authority=authority_url,
-    client_credential=client_secret
+    client_credential=client_secret,
     token_cache=None,
     verify=True
 )
- 
- 
+
+# Streamlit UI
+st.title("📂 Buddy Bot: Your Friendly Companion ")
+
 # Authentication flow
 def get_auth_url():
     auth_url = app.get_authorization_request_url(
         scopes, redirect_uri=redirect_uri)
     return auth_url
- 
+
 def get_token_from_code(auth_code):
     result = app.acquire_token_by_authorization_code(
         auth_code, scopes=scopes, redirect_uri=redirect_uri)
     return result
- 
+
 # Cache the authentication headers
 @st.cache_resource
 def get_auth_headers(auth_code=None):
@@ -180,11 +179,11 @@ def get_auth_headers(auth_code=None):
         if 'access_token' in token_response:
             return {'Authorization': f'Bearer {token_response["access_token"]}'}
     return None
- 
+
 # Add this to initialize folder path in session state
 if 'current_folder_path' not in st.session_state:
     st.session_state.current_folder_path = ""
- 
+
 # Update the list_items function to handle folder navigation and check for empty folders/sites
 def list_items(url, headers, path="", prefix="", indent=""):
     items_list = []
@@ -214,15 +213,15 @@ def list_items(url, headers, path="", prefix="", indent=""):
                 file_count += sub_file_count
                 folder_count += sub_folder_count
     return items_list, file_count, folder_count
- 
+
 def download_file(site_id, file_path, headers):
     file_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/root:/{file_path}:/content"
     download_response = requests.get(file_url, headers=headers)
- 
+
     if download_response.status_code == 200:
         return download_response.content, file_path.split("/")[-1]
     return None, None
- 
+
 # Function to download all files in a folder and create a zip archive
 def download_folder_as_zip(site_id, folder_path, headers):
     folder_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/root:/{folder_path}:/children"
@@ -231,7 +230,7 @@ def download_folder_as_zip(site_id, folder_path, headers):
         items = response.json().get('value', [])
         folder_name = folder_path.split("/")[-1]
         zip_filename = f"{folder_name}.zip"
- 
+
         with io.BytesIO() as zip_buffer:
             with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
                 for item in items:
@@ -244,7 +243,7 @@ def download_folder_as_zip(site_id, folder_path, headers):
             zip_buffer.seek(0)
             return zip_buffer.read(), zip_filename
     return None, None
- 
+
 # Function to list accessible sites
 def list_accessible_sites(headers):
     sites_url = "https://graph.microsoft.com/v1.0/sites?search=*"
@@ -253,7 +252,7 @@ def list_accessible_sites(headers):
         sites = response.json().get('value', [])
         return [(site['name'], site['webUrl']) for site in sites]
     return []
- 
+
 # Update the search_files function to search recursively
 def search_files(site_id, query, headers):
     search_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/root/search(q='{query}')"
@@ -262,7 +261,7 @@ def search_files(site_id, query, headers):
         items = response.json().get('value', [])
         return items
     return []
- 
+
 def read_file_content(file_content, file_name):
     content = ""
     try:
@@ -280,55 +279,55 @@ def read_file_content(file_content, file_name):
     except Exception as e:
         st.error(f"Error reading {file_name}: {str(e)}")
     return content
- 
+
 def preprocess_content(content):
     lines = content.split('\n')
     processed_lines = [line for line in lines if len(
         line.split()) > 3 and not line.strip().startswith('http')]
     return ' '.join(processed_lines)
- 
+
 def search_answer(question, file_contents):
     if not file_contents:
         return "I couldn't find any content in the files to answer the question."
- 
+
     # Combine all file contents, keeping track of which document each sentence comes from
     all_content = []
     for doc_name, content in file_contents.items():
         sentences = [sent.strip() for sent in content.split('.') if sent.strip()]
         all_content.extend([(sent, doc_name) for sent in sentences])
- 
+
     # Separate sentences and document names
     sentences, doc_names = zip(*all_content)
     sentences = list(sentences)
- 
+
     # Add the question to the sentences
     sentences.append(question)
- 
+
     # Create TF-IDF vectors
     vectorizer = TfidfVectorizer()
     tfidf_matrix = vectorizer.fit_transform(sentences)
- 
+
     # Compute cosine similarity
     cosine_similarities = cosine_similarity(tfidf_matrix[-1:], tfidf_matrix[:-1])[0]
- 
+
     # Get indices of sentences with a similarity above the threshold
     relevant_sentence_indices = [i for i, score in enumerate(cosine_similarities) if score > 0.2]
- 
+
     answers_dict = {}
- 
+
     for idx in relevant_sentence_indices:
         sentence = sentences[idx].strip()
         # Remove citations and irrelevant information
         sentence = re.sub(r'\[[^\]]*\]', '', sentence)
         sentence = re.sub(r'\s+', ' ', sentence).strip()
- 
+
         # Check if the sentence is complete and relevant
         if len(sentence.split()) > 5 and not sentence.startswith("Artificial intelligence") and "founding fathers of AI" not in sentence:
             doc_name = doc_names[idx]
             if doc_name not in answers_dict:
                 answers_dict[doc_name] = []
             answers_dict[doc_name].append(sentence)
- 
+
     if answers_dict:
         answer = "Here's what I found about your question:\n\n"
         for doc_name, relevant_sentences in answers_dict.items():
@@ -339,9 +338,8 @@ def search_answer(question, file_contents):
             answer += f"**Source: {doc_name}**\n{combined_answer}\n\n"
     else:
         answer = "I'm sorry, but I couldn't find any relevant information to answer your question."
- 
+
     return answer
- 
 # Function to download file content
 def download_file_content(site_id, file_id, headers):
     file_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/items/{file_id}/content"
@@ -349,14 +347,14 @@ def download_file_content(site_id, file_id, headers):
     if response.status_code == 200:
         return response.content
     return None
- 
+
 # Function to add a message to the chat history
 def add_message(role, content):
     timestamp = datetime.now()
     st.session_state.messages.append({"role": role, "content": content, "timestamp": timestamp})
     with st.chat_message(role):
         st.markdown(content)
- 
+
 # Updated function to display chat history
 def display_chat_history():
     st.sidebar.title("Chat History")
@@ -366,28 +364,24 @@ def display_chat_history():
         padding: 10px;
         border-radius: 10px;
         margin-bottom: 10px;
-        font-size: 13px;
-        color:#ffffff
+        font-size: 14px;
     }
     .user-message {
-       
+        background-color: #e6f3ff;
         border-left: 5px solid #2196F3;
-        color:#ffffff
     }
     .assistant-message {
-       
+        background-color: #f0f0f0;
         border-left: 5px solid #4CAF50;
-        color:#ffffff
     }
     .timestamp {
         font-size: 10px;
-        color: #f4a303;
+        color: #888;
         margin-top: 5px;
-        color:#ffffff
     }
     </style>
     """, unsafe_allow_html=True)
- 
+
     current_time = datetime.now()
     for msg in reversed(st.session_state.messages):
         if current_time - msg["timestamp"] < timedelta(hours=24):
@@ -398,12 +392,13 @@ def display_chat_history():
                 <div class="timestamp">{msg['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}</div>
             </div>
             """, unsafe_allow_html=True)
-            # Main conversation flow starts here...
+
+# Main conversation flow starts here
 if 'auth_code' not in st.session_state:
-    if st.button("Login"):
+    if st.button("Authenticate to use the app"):
         auth_url = get_auth_url()
-        st.query_params["auth_url"] = auth_url
-        st.rerun()
+        st.markdown(f'<a href="{auth_url}" target="_blank">Click here to Authenticate</a>', unsafe_allow_html=True)
+        
 else:
     headers = get_auth_headers(st.session_state['auth_code'])
     if headers:
@@ -412,16 +407,15 @@ else:
             st.session_state.items_dict = {}
             st.session_state.search_results_dict = {}
             st.session_state.file_contents = {}
- 
+
         # Display chat history
         display_chat_history()
- 
-        if not st.session_state.messages:
-            add_message("assistant", "Hello! I'm your SharePoint File Downloader and Query Assistant. How can I help you today?")
-            add_message("assistant", "Would you like to view the sites you have access to? (Yes/No)")
- 
-        # Get user input for viewing sites
 
+        if not st.session_state.messages:
+            add_message("assistant", "Hello! I'm your Buddy Bot and Query Assistant. How can I help you today?")
+            add_message("assistant", "Would you like to view the sites you have access to? (Yes/No)")
+
+        # Get user input for viewing sites
         user_input = st.text_input("Your response:")
         if user_input.lower() == 'yes':
             accessible_sites = list_accessible_sites(headers)
@@ -433,34 +427,34 @@ else:
                 add_message("assistant", "I'm sorry, I couldn't retrieve the list of accessible sites. Please enter the name of the SharePoint site you want to access.")
         elif user_input.lower() == 'no':
             add_message("assistant", "Alright. Please enter the name of the SharePoint site you want to access (e.g., 'Chatbot_resource').")
- 
+
         # Get site name input from user
         site_name = st.text_input("SharePoint Site Name:")
- 
+
         # Define items per page
-        ITEMS_PER_PAGE = 5
- 
+        ITEMS_PER_PAGE = 20
+
         # Function to get paginated items
         def get_paginated_items(items_list, page, items_per_page=ITEMS_PER_PAGE):
             start_index = (page - 1) * items_per_page
             end_index = start_index + items_per_page
             return items_list[start_index:end_index], len(items_list) // items_per_page + (1 if len(items_list) % items_per_page != 0 else 0)
- 
+
         # Track the current page in the session state
         if 'current_page' not in st.session_state:
             st.session_state.current_page = 1
- 
+
         # Add a function to display items with pagination and folder navigation
         def show_paginated_items(items_list, file_count, folder_count):
             current_items, total_pages = get_paginated_items(
                 items_list, st.session_state.current_page)
- 
+
             st.write(f"Total Files: {file_count}, Total Folders: {folder_count}")
-           
+            
             html_string = "<br>".join(
                 f"<span style='font-size:15px'>{item[2]}</span>" for item in current_items)
             st.markdown(html_string, unsafe_allow_html=True)
- 
+
             # Navigation buttons
             col1, col2, col3 = st.columns(3)
             with col1:
@@ -468,17 +462,17 @@ else:
                     if st.button("Previous"):
                         st.session_state.current_page -= 1
                         st.rerun()
- 
+
             with col2:
                 st.write(
                     f"Page {st.session_state.current_page} of {total_pages}")
- 
+
             with col3:
                 if st.session_state.current_page < total_pages:
                     if st.button("Next"):
                         st.session_state.current_page += 1
                         st.rerun()
- 
+
             # Add a back button to go back to the parent folder
             if st.session_state.current_folder_path:
                 if st.button("Back"):
@@ -486,22 +480,22 @@ else:
                         st.session_state.current_folder_path.split("/")[:-1])
                     st.session_state.current_page = 1
                     st.rerun()
-           
+            
         # Update the main conversation flow to handle folder navigation and empty folders/sites
         if site_name:
             site_info_url = f'https://graph.microsoft.com/v1.0/sites/novintix.sharepoint.com:/sites/{site_name}'
             site_response = requests.get(site_info_url, headers=headers)
- 
+
             if site_response.status_code == 200:
                 site_info = site_response.json()
                 if st.session_state.current_folder_path:
                     drive_url = f"https://graph.microsoft.com/v1.0/sites/{site_info['id']}/drive/root:/{st.session_state.current_folder_path}:/children"
                 else:
                     drive_url = f"https://graph.microsoft.com/v1.0/sites/{site_info['id']}/drive/root/children"
- 
+
                 items_list, file_count, folder_count = list_items(
                     drive_url, headers, st.session_state.current_folder_path)
- 
+
                 if items_list and items_list[0][0] == "empty":
                     add_message(
                         "assistant", f"The SharePoint site '{site_name}' or the current folder is empty.")
@@ -512,22 +506,22 @@ else:
                         "assistant", f"Here are the contents of the SharePoint site '{site_name}':")
                     show_paginated_items(items_list, file_count, folder_count)  # Show items with pagination and counts
                     add_message(
-                        "assistant", "Please provide the item number to view a folder's contents, to download('folder 1') or download a file. Or, ask a question by starting with 'Question:'")
+                        "assistant", "Please provide the item number to view a folder's contents, to download('f:1') or download a file just provide the file number (Eg:5). Or, ask a question by starting with 'Q:'")
             else:
                 add_message(
                     "assistant", "I'm sorry, I couldn't access the SharePoint site. Please check the site name and try again.")
- 
+
         # Main conversation flow handling folder download requests and questions
-        if prompt := st.text_input("You:"):
+        if prompt := st.chat_input("You:"):
             add_message("user", prompt)
- 
-            if prompt.lower().startswith("question:"):
-                question = prompt[9:].strip()  # Remove "Question:" prefix
+
+            if prompt.lower().startswith("q:"):
+                question = prompt[2:].strip()  # Remove "Question:" prefix
                 add_message("assistant", f"Searching for an answer to: '{question}'")
-               
+                
                 # Search for relevant files
                 search_results = search_files(site_info['id'], question, headers)
-               
+                
                 if search_results:
                     # Download and read content of relevant files
                     for item in search_results[:5]:  # Limit to first 5 results for efficiency
@@ -535,22 +529,22 @@ else:
                         if file_content:
                             content = read_file_content(file_content, item['name'])
                             st.session_state.file_contents[item['name']] = content
-                   
+                    
                     # Search for answer in the downloaded content
                     answer = search_answer(question, st.session_state.file_contents)
                     add_message("assistant", answer)
                 else:
                     add_message("assistant", "I'm sorry, I couldn't find any relevant files to answer your question.")
- 
-            elif prompt.lower().startswith("folder"):
+
+            elif prompt.lower().startswith("f:"):
                 try:
-                    folder_num = prompt.split()[1]
- 
+                    folder_num = prompt[2:].strip()
+
                     # Check if folder_num exists in items_dict
                     if folder_num in st.session_state.items_dict:
                         item_path, item_type = st.session_state.items_dict.get(
                             folder_num, (None, None))
- 
+
                         if item_path and item_type == 'Folder':
                             # Download the entire folder as a zip
                             zip_content, zip_filename = download_folder_as_zip(
@@ -574,8 +568,8 @@ else:
                             "assistant", f"No folder found with the number {folder_num}. Please check the number and try again.")
                 except IndexError:
                     add_message(
-                        "assistant", "Please specify the folder number after 'folder'. For example: 'folder 2'.")
- 
+                        "assistant", "Please specify the folder number after 'f:'. For example: 'f:2'.")
+
             elif prompt.isdigit() or (prompt.replace('.', '').isdigit() and prompt.count('.') == 1):
                 item_path, item_type = st.session_state.items_dict.get(
                     prompt, (None, None))
@@ -600,37 +594,37 @@ else:
                 else:
                     add_message(
                         "assistant", "I'm sorry, the item number you provided does not exist. Please check the item number and try again.")
- 
+
             else:
                 # Handle search queries
                 query = prompt
                 add_message(
                     "assistant", f"Searching for files related to '{query}'...")
                 search_results = search_files(site_info['id'], query, headers)
- 
+
                 if search_results:
                     search_results_list = [
                         f"{idx + 1}. {item['name']} (File)" for idx, item in enumerate(search_results[:10])]  # Limit to first 10 results
                     search_results_dict = {
                         str(idx + 1): item['id'] for idx, item in enumerate(search_results[:10])}
- 
+
                     st.session_state.search_results_dict = search_results_dict
                     search_results_text = "\n".join(search_results_list)
                     add_message(
                         "assistant", f"Here are the top files related to your query:\n\n{search_results_text}")
                     add_message(
                         "assistant", "Please provide the file number to download, or ask another question.")
- 
+
                 else:
                     add_message(
                         "assistant", "No files found related to your query. Please try again with a different query.")
- 
+
             if st.session_state.get('search_results_dict') and prompt in st.session_state['search_results_dict']:
                 file_id = st.session_state['search_results_dict'][prompt]
                 file_info_url = f"https://graph.microsoft.com/v1.0/sites/{site_info['id']}/drive/items/{file_id}"
                 file_info_response = requests.get(
                     file_info_url, headers=headers)
- 
+
                 if file_info_response.status_code == 200:
                     file_info = file_info_response.json()
                     file_name = file_info['name']
@@ -638,34 +632,29 @@ else:
                     file_content = requests.get(download_url).content
                     add_message(
                         "assistant", f"Great! I've successfully downloaded '{file_name}' for you.")
- 
+
                     # Create a download button
                     b64 = base64.b64encode(file_content).decode()
                     href = f'<a href="data:application/octet-stream;base64,{b64}" download="{file_name}">Click here to download {file_name}</a>'
                     st.markdown(href, unsafe_allow_html=True)
- 
+
                     add_message(
                         "assistant", "Is there anything else you'd like to do? (Yes/No)")
                 else:
                     add_message(
                         "assistant", "I'm sorry, I couldn't retrieve the file information. Please try again.")
- 
+
         # Add a button to clear the conversation
         if st.button("Clear Conversation"):
             st.session_state.messages = []
             st.rerun()
-   
-
-
 
 # To handle the redirection and capture the auth code
 if 'auth_code' not in st.session_state and 'code' in st.query_params:
     st.session_state.auth_code = st.query_params['code']
     st.rerun()
- 
+
 # Redirect to authentication URL
 if 'auth_url' in st.query_params:
     st.markdown(
         f'<meta http-equiv="refresh" content="0; url={st.query_params["auth_url"]}">', unsafe_allow_html=True)
- 
- 
