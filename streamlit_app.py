@@ -18,25 +18,25 @@ import os
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
- 
+
     [data-testid=stHeader] {
         background: linear-gradient(to top, #0e4166 0%, #000000 100%); # for header background
- 
+
     }
- 
+
     .stApp{
         background:#0e4166 ; # whole center background and bottom color
     }
- 
+
     [data-testid=stWidgetLabel],[data-testid=stMarkdown] {
         color:#ffffff;
     }
- 
+
     [data-testid=stSidebar] {
             background:linear-gradient(to top ,#0e4166 93%,#000000 100%); # for sidebar
- 
+
     }
- 
+
     .title-container {
         background: rgba(14, 65, 102, 0.8);
         backdrop-filter: blur(10px);
@@ -45,7 +45,7 @@ st.markdown("""
         margin-bottom: 30px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
- 
+
     .title {
         color: #f4a303;
         font-size: 36px;
@@ -53,21 +53,21 @@ st.markdown("""
         text-align: center;
         margin-bottom: 10px;
     }
- 
+
     .subtitle {
         color: #ffffff;
         font-size: 20px;
         text-align: center;
         font-weight: 300;
     }
- 
+
     .service-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
         gap: 20px;
         margin-top: 30px;
     }
- 
+
     .service-card {
         background: #003d59;
         border-radius: 10px;
@@ -76,30 +76,30 @@ st.markdown("""
         text-align: center;
         transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
- 
+
     .service-card:hover {
         transform: translateY(-5px);
         box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
     }
- 
+
     .service-icon {
         font-size: 40px;
         margin-bottom: 10px;
     }
- 
+
     .service-title {
         color: #f4a303;
         font-size: 20px;
         font-weight: 700;
         margin-bottom: 10px;
     }
- 
+
     .service-description {
         color: #f4a303;
         font-size: 14px;
- 
+
     }
- 
+
 </style>
 """, unsafe_allow_html=True)
  
@@ -419,7 +419,7 @@ else:
             add_message("assistant", "Would you like to view the sites you have access to? (Yes/No)")
  
         # Get user input for viewing sites
- 
+
         user_input = st.text_input("Your response:")
         if user_input.lower() == 'yes':
             accessible_sites = list_accessible_sites(headers)
@@ -653,9 +653,9 @@ else:
             st.session_state.messages = []
             st.rerun()
    
- 
- 
- 
+
+
+
 # To handle the redirection and capture the auth code
 if 'auth_code' not in st.session_state and 'code' in st.query_params:
     st.session_state.auth_code = st.query_params['code']
@@ -665,6 +665,5 @@ if 'auth_code' not in st.session_state and 'code' in st.query_params:
 if 'auth_url' in st.query_params:
     st.markdown(
         f'<meta http-equiv="refresh" content="0; url={st.query_params["auth_url"]}">', unsafe_allow_html=True)
- 
  
  
