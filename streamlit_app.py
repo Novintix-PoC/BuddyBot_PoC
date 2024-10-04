@@ -156,6 +156,8 @@ app = msal.ConfidentialClientApplication(
     client_id,
     authority=authority_url,
     client_credential=client_secret
+    token_cache=None,
+    verify=True
 )
  
  
