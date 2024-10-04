@@ -157,9 +157,6 @@ app = msal.ConfidentialClientApplication(
     verify=True
 )
 
-# Streamlit UI
-st.title("📂 Buddy Bot: Your Friendly Companion ")
-
 # Authentication flow
 def get_auth_url():
     auth_url = app.get_authorization_request_url(
@@ -335,7 +332,7 @@ def search_answer(question, file_contents):
             combined_answer = combined_answer.capitalize()
             if not combined_answer.endswith('.'):
                 combined_answer += '.'
-            answer += f"**Source: {doc_name}**\n{combined_answer}\n\n"
+            answer += f"*Source: {doc_name}*\n{combined_answer}\n\n"
     else:
         answer = "I'm sorry, but I couldn't find any relevant information to answer your question."
 
@@ -395,7 +392,7 @@ def display_chat_history():
 
 # Main conversation flow starts here
 if 'auth_code' not in st.session_state:
-    if st.button("Authenticate to use the app"):
+    if st.button("Login"):
         auth_url = get_auth_url()
         st.markdown(f'<a href="{auth_url}" target="_blank">Click here to Authenticate</a>', unsafe_allow_html=True)
         
@@ -512,7 +509,7 @@ else:
                     "assistant", "I'm sorry, I couldn't access the SharePoint site. Please check the site name and try again.")
 
         # Main conversation flow handling folder download requests and questions
-        if prompt := st.chat_input("You:"):
+        if prompt := st.text_input("You:"):
             add_message("user", prompt)
 
             if prompt.lower().startswith("q:"):
