@@ -14,27 +14,27 @@ from datetime import datetime, timedelta
 import streamlit_pagination as stp
 import zipfile
 import os
- 
+
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
  
     [data-testid=stHeader] {
         background: linear-gradient(to top, #0e4166 0%, #000000 100%); # for header background
- 
+         
     }
  
     .stApp{
         background:#0e4166 ; # whole center background and bottom color
     }
- 
+
     [data-testid=stWidgetLabel],[data-testid=stMarkdown] {
         color:#ffffff;
     }
  
     [data-testid=stSidebar] {
             background:linear-gradient(to top ,#0e4166 93%,#000000 100%); # for sidebar
- 
+           
     }
  
     .title-container {
@@ -97,12 +97,12 @@ st.markdown("""
     .service-description {
         color: #f4a303;
         font-size: 14px;
- 
+           
+   
     }
- 
+     
 </style>
 """, unsafe_allow_html=True)
- 
  
 st.markdown("""
     <div class="title-container">
@@ -137,19 +137,19 @@ with col[2]:
     """, unsafe_allow_html=True)
  
 # Load environment variables from .env file
- 
+
  
 # Access environment variables
 client_id = st.secrets["CLIENT_ID"]
 client_secret = st.secrets["CLIENT_SECRET"]
 tenant_id = st.secrets["TENANT_ID"]
-redirect_uri = st.secrets["REDIRECT_URI"]
+redirect_uri = st.secrets["URL"]
  
 # Azure AD app details
 authority_url = f'https://login.microsoftonline.com/{tenant_id}'
  
 # Define the scopes required for accessing SharePoint
-scopes = ['Files.Read.All', 'Sites.Read.All']
+scopes = ['Files.ReadWrite.All', 'Sites.Read.All']
  
 # MSAL configuration
 app = msal.ConfidentialClientApplication(
@@ -365,23 +365,20 @@ def display_chat_history():
         border-radius: 10px;
         margin-bottom: 10px;
         font-size: 13px;
-        color:#ffffff
+        color:#ffffff;
     }
     .user-message {
        
         border-left: 5px solid #2196F3;
-        color:#ffffff
     }
     .assistant-message {
        
         border-left: 5px solid #4CAF50;
-        color:#ffffff
     }
     .timestamp {
         font-size: 10px;
         color: #f4a303;
         margin-top: 5px;
-        color:#ffffff
     }
     </style>
     """, unsafe_allow_html=True)
@@ -419,7 +416,6 @@ else:
             add_message("assistant", "Would you like to view the sites you have access to? (Yes/No)")
  
         # Get user input for viewing sites
- 
         user_input = st.text_input("Your response:")
         if user_input.lower() == 'yes':
             accessible_sites = list_accessible_sites(headers)
@@ -648,13 +644,11 @@ else:
                     add_message(
                         "assistant", "I'm sorry, I couldn't retrieve the file information. Please try again.")
  
-        # Add a button to clear the conversation
-        if st.button("Clear Conversation"):
-            st.session_state.messages = []
-            st.rerun()
-   
- 
- 
+        # # Add a button to clear the conversation
+        # if st.button("Clear Conversation"):
+        #     st.session_state.messages = []
+        #    
+        #     st.rerun()
  
 # To handle the redirection and capture the auth code
 if 'auth_code' not in st.session_state and 'code' in st.query_params:
@@ -665,6 +659,4 @@ if 'auth_code' not in st.session_state and 'code' in st.query_params:
 if 'auth_url' in st.query_params:
     st.markdown(
         f'<meta http-equiv="refresh" content="0; url={st.query_params["auth_url"]}">', unsafe_allow_html=True)
- 
- 
  
